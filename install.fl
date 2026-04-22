@@ -4,13 +4,13 @@ import os;
 
 fn build_kzen(is_debug: bool) {
     if is_debug {
-        var result = process.spawn("zig build", true)
+        var result = process.spawn("zig build", false)
             ~> process.assert("Build failed");        
     
         return;
     }
 
-    const result = process.spawn("zig build -Doptimize=ReleaseSmall -Dcpu=native", true)
+    const result = process.spawn("zig build -Doptimize=ReleaseSmall -Dcpu=native", false)
         ~> process.assert("Build failed");        
 }
 
