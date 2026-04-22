@@ -1,0 +1,24 @@
+import process;
+import fs;
+
+fn build_kzen() {
+    const result = process.spawn("zig build #-Doptimize=ReleaseSmall -Dcpu=native", true)
+        ~> if_fail("Build failed");
+}
+
+fn main() {
+    const kzen_bin_path = "zig-out/bin/kzen";
+    const kzen_install_path = "/usr/local/bin/kz";
+
+    -- build kzen
+    print("Builing kzen...");
+    build_kzen();
+
+    -- move kzen binary to path
+    print("Installing kzen...");
+    process.spawn($"sudo mv {kzen_bin_path} {kzen_install_path}", true) ~> if_fail("Unable to move kzen binary to path");
+
+    print("kzen successfully installed!");
+}
+
+main();

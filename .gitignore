@@ -1,0 +1,6 @@
+# zig caches
+.zig-cache/
+zig-out/
+
+# install bin
+install
