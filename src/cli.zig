@@ -42,7 +42,7 @@ pub fn cli(init: std.process.Init) !u8 {
 
         // print help in stderr
         try help.help(writer.stderr);
-        try writer.stderr.print("\nUnknow command: '{s}'\n", .{arg});
+        try writer.stderr.print("\nUnknown command: '{s}'\n", .{arg});
         return 1;
     }
 
