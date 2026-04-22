@@ -24,7 +24,11 @@ kz cut input.mp4 00:30 01:00 -o output.mp4
 
 ## Install
 
-You need to have Flint installed:
+Requirements:
+- flint (1.14.0)
+- zig (0.16.0)
+
+If you don't have Flint installed:
 
 See how to install [here](https://github.com/the-flint-lang/flint#installing-on-debianubuntu-apt-repository---recommended)
 
