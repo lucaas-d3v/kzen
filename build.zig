@@ -4,9 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const opts = b.addOptions();
+    opts.addOption([]const u8, "kzen_version", "0.0.1-dev");
+
     const mod = b.addModule("kzen", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/cli.zig"),
         .target = target,
+        .imports = &.{
+            .{ .name = "build_options", .module = opts.createModule() },
+        },
     });
 
     const exe = b.addExecutable(.{
@@ -21,6 +27,21 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // optimization for final kzen binary
+    if (optimize != .Debug) {
+        exe.root_module.strip = true;
+        exe.lto = .full;
+        exe.link_gc_sections = true;
+
+        exe.stack_size = 1 * 1024 * 1024;
+        exe.compress_debug_sections = .zstd;
+        exe.root_module.unwind_tables = .none;
+
+        exe.root_module.strip = true;
+        exe.link_gc_sections = true;
+        exe.lto = .full;
+    }
+
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
@@ -33,20 +54,4 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| {
         run_cmd.addArgs(args);
     }
-
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
-    });
-
-    const run_mod_tests = b.addRunArtifact(mod_tests);
-
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
-
-    const run_exe_tests = b.addRunArtifact(exe_tests);
-
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
 }

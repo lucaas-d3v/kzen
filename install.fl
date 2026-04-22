@@ -1,18 +1,36 @@
 import process;
 import fs;
+import os;
 
-fn build_kzen() {
-    const result = process.spawn("zig build #-Doptimize=ReleaseSmall -Dcpu=native", true)
-        ~> if_fail("Build failed");
+fn build_kzen(is_debug: bool) {
+    if is_debug {
+        var result = process.spawn("zig build", true)
+            ~> process.assert("Build failed");        
+    
+        return;
+    }
+
+    const result = process.spawn("zig build -Doptimize=ReleaseSmall -Dcpu=native", true)
+        ~> process.assert("Build failed");        
 }
 
 fn main() {
+    const args = os.args();
+
+    var is_debug = false;
+    if len(args) > 1 {
+        if args[1] == "-d" {
+            is_debug = true;    
+        }        
+    }
+
     const kzen_bin_path = "zig-out/bin/kzen";
     const kzen_install_path = "/usr/local/bin/kz";
 
     -- build kzen
     print("Builing kzen...");
-    build_kzen();
+
+    build_kzen(is_debug);
 
     -- move kzen binary to path
     print("Installing kzen...");
