@@ -27,6 +27,7 @@ kz cut input.mp4 00:30 01:00 -o output.mp4
 Requirements:
 - flint (1.14.0)
 - zig (0.16.0)
+- ffmpeg (5.1.8-0)
 
 If you don't have Flint installed:
 
