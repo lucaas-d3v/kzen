@@ -21,38 +21,73 @@ pub fn info(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
 
     var child = try init.io.vtable.processSpawn(init.io.userdata, .{
         .argv = ffmpeg_args,
-        .stdin = .pipe,
-        .stdout = .inherit,
+        .stdin = .close,
+        .stdout = .pipe,
         .stderr = .inherit,
     });
 
-    if (child.stdin) |s| {
-        init.io.vtable.fileClose(init.io.userdata, &.{s});
-        child.stdin = null;
-    }
+    const max_size = 1024 * 1024;
+    const buf = try alloc.alloc(u8, max_size);
+    errdefer alloc.free(buf);
 
-    try writer.print("{s}{s}File{s}: {s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, info_flags.input_file });
-    try writer.flush();
+    var fifo_buf: [4096]u8 = undefined;
+    var reader = child.stdout.?.reader(init.io, &fifo_buf);
+
+    const actual_len = try reader.interface.readSliceShort(buf);
+
+    const stdout_output = buf[0..actual_len];
+    defer alloc.free(buf);
 
     const term = try init.io.vtable.childWait(init.io.userdata, &child);
 
     switch (term) {
         .exited => |code| if (code != 0) {
-            try writer.print("{s}✖{s} Info failed\n", .{ colors.ERROR, colors.RESET });
+            try writer.print("{s}✖{s} Info failed (code {d})\n", .{ colors.ERROR, colors.RESET, code });
             try writer.flush();
-
             return error.ProcessFailed;
         },
         else => return error.ProcessTerminatedUnexpectedly,
     }
 
-    std.debug.print("DEBUG:\n", .{});
-    std.debug.print("  input file: {s}\n", .{info_flags.input_file});
+    try writer.print("{s}File{s}: {s}{s}{s}\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, info_flags.input_file, colors.RESET });
+    try writer.flush();
+
+    const parsed = try std.json.parseFromSlice(FfprobeOutput, alloc, stdout_output, .{
+        .ignore_unknown_fields = true,
+    });
+    defer parsed.deinit();
+
+    const ffprobe_data = parsed.value;
+
+    if (ffprobe_data.format.duration) |d_str| {
+        const duration = try parseDuration(d_str);
+        try writer.print("{s}Duration{s}: {s}{d:.2}s{s}\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, duration, colors.RESET });
+    }
+    if (ffprobe_data.format.bit_rate) |br_str| {
+        try writer.print("{s}Bitrate{s}: {s}{d:.2}{s} Mbps\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, try humanizeBitrate(br_str), colors.RESET });
+    }
+
+    // streams
+    for (ffprobe_data.streams) |stream| {
+        if (std.mem.eql(u8, stream.codec_type, "video")) {
+            try writer.print("\n{s}Video{s}:\n", .{ colors.PRIMARY, colors.RESET });
+            if (stream.codec_name) |codec| try writer.print("  {s}{s}Codec{s}: {s}{s}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, codec, colors.RESET });
+            if (stream.width) |w| try writer.print("  {s}{s}Resolution{s}: {s}{d}{s}x{s}{d}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, w, colors.RESET, colors.TEXT, stream.height.?, colors.RESET });
+
+            if (stream.avg_frame_rate) |fps_str| {
+                const fps = try parseFps(fps_str);
+                try writer.print("  {s}{s}FPS{s}: {s}{d:.2}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, fps, colors.RESET });
+            }
+        } else if (std.mem.eql(u8, stream.codec_type, "audio")) {
+            try writer.print("\n{s}Audio{s}:\n", .{ colors.PRIMARY, colors.RESET });
+            if (stream.codec_name) |codec| try writer.print("  {s}{s}Codec{s}: {s}{s}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, codec, colors.RESET });
+        }
+    }
 }
 
-const InfoFlags = struct {
-    input_file: []const u8,
-};
+fn humanizeBitrate(bitrate: []const u8) !f32 {
+    return try std.fmt.parseFloat(f32, bitrate) / 1000 / 1000;
+}
 
 fn getFFprobeArgs(alloc: std.mem.Allocator, info_flags: InfoFlags) ![]const []const u8 {
     // reference: ffprobe -v error -print_format json -show_format -show_streams input.mp4
@@ -99,3 +134,43 @@ fn parseInfoFlagsFromArgs(writer: *std.Io.Writer, args: []const []const u8) !?In
 
     return info_flags;
 }
+
+// converts "60/1" or "30000/1001" to f32
+fn parseFps(fps_str: []const u8) !f32 {
+    var it = std.mem.splitScalar(u8, fps_str, '/');
+    const num_str = it.next() orelse return error.InvalidFpsFormat;
+    const den_str = it.next() orelse "1"; // falback
+
+    const num = try std.fmt.parseFloat(f32, num_str);
+    const den = try std.fmt.parseFloat(f32, den_str);
+
+    if (den == 0.0) return 0.0;
+    return num / den;
+}
+
+// converts "62.346000" to f32
+fn parseDuration(duration_str: []const u8) !f32 {
+    return std.fmt.parseFloat(f32, duration_str);
+}
+
+const InfoFlags = struct {
+    input_file: []const u8,
+};
+
+const FfprobeStream = struct {
+    codec_type: []const u8,
+    codec_name: ?[]const u8 = null,
+    width: ?u32 = null,
+    height: ?u32 = null,
+    avg_frame_rate: ?[]const u8 = null,
+};
+
+const FfprobeFormat = struct {
+    duration: ?[]const u8 = null,
+    bit_rate: ?[]const u8 = null,
+};
+
+const FfprobeOutput = struct {
+    streams: []FfprobeStream,
+    format: FfprobeFormat,
+};
