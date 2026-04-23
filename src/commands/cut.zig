@@ -1,5 +1,8 @@
 const std = @import("std");
 
+const colors = @import("../ui/color.zig");
+const styles = @import("../ui/styles.zig");
+
 const checker = @import("../utils/checker.zig");
 const help = @import("../flags/help.zig");
 
@@ -22,12 +25,23 @@ pub fn cut(init: std.process.Init, alloc: std.mem.Allocator, writer: *std.Io.Wri
         child.stdin = null;
     }
 
+    try writer.print("{s}{s}➜ Cutting video...{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET });
+    try writer.flush();
+
     const term = try init.io.vtable.childWait(init.io.userdata, &child);
 
     switch (term) {
-        .exited => |code| if (code != 0) return error.ProcessFailed,
+        .exited => |code| if (code != 0) {
+            try writer.print("{s}✖{s} Cut failed\n", .{ colors.ERROR, colors.RESET });
+            try writer.flush();
+
+            return error.ProcessFailed;
+        },
         else => return error.ProcessTerminatedUnexpectedly,
     }
+
+    try writer.print("{s}✔{s} Cut completed: {s}{s}{s}\n", .{ colors.SUCCESS, colors.RESET, colors.PRIMARY, cut_flags.output_name, colors.RESET });
+    try writer.flush();
 }
 
 fn getFFmpegArgs(alloc: std.mem.Allocator, cut_flags: CutFlags) ![]const []const u8 {
@@ -35,6 +49,12 @@ fn getFFmpegArgs(alloc: std.mem.Allocator, cut_flags: CutFlags) ![]const []const
     var args = std.ArrayList([]const u8).empty;
 
     try args.append(alloc, "ffmpeg");
+
+    try args.append(alloc, "-hide_banner");
+
+    try args.append(alloc, "-loglevel");
+    try args.append(alloc, "error");
+
     try args.append(alloc, "-ss");
 
     const start = try std.fmt.allocPrint(alloc, "{d}:{d}:{d}", .{ cut_flags.start.hour, cut_flags.start.min, cut_flags.start.secs });
@@ -51,6 +71,7 @@ fn getFFmpegArgs(alloc: std.mem.Allocator, cut_flags: CutFlags) ![]const []const
     try args.append(alloc, "copy");
     try args.append(alloc, cut_flags.output_name);
 
+    try args.append(alloc, "-y");
     return args.toOwnedSlice(alloc);
 }
 
