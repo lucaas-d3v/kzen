@@ -47,7 +47,17 @@ pub fn cli(init: std.process.Init) !u8 {
 
         // commands
         if (checker.argEql(arg, "cut")) {
-            try cut.cut(writer.stdout, args[i + 1 ..]); // +1 because of the 'cut' argument
+            // +1 because of the 'cut' argument
+            cut.cut(init, alloc, writer.stdout, args[i + 1 ..]) catch |err| {
+                switch (err) {
+                    error.ProcessFailed => return 1,
+                    else => {
+                        try help.helpCut(writer.stderr);
+                        return 1;
+                    },
+                }
+            };
+
             return 0;
         }
 

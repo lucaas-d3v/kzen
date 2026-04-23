@@ -1,17 +1,60 @@
 const std = @import("std");
+
 const checker = @import("../utils/checker.zig");
+const help = @import("../flags/help.zig");
 
-pub fn cut(writer: *std.Io.Writer, args: []const []const u8) !void {
-    const cut_flags = try argsToCutFlags(args);
+pub fn cut(init: std.process.Init, alloc: std.mem.Allocator, writer: *std.Io.Writer, args: []const []const u8) !void {
+    const maybe_flags = try argsToCutFlags(writer, args);
+    const cut_flags = maybe_flags orelse return;
 
-    try writer.print("start = {any}\n", .{cut_flags.start});
-    try writer.print("end = {any}\n", .{cut_flags.end});
-    try writer.print("input name = {s}\n", .{cut_flags.input_file_name});
-    try writer.print("out name = {s}\n", .{cut_flags.output_name});
-    try writer.flush();
+    const ffmpeg_args = try getFFmpegArgs(alloc, cut_flags);
+    defer alloc.free(ffmpeg_args);
+
+    var child = try init.io.vtable.processSpawn(init.io.userdata, .{
+        .argv = ffmpeg_args,
+        .stdin = .pipe,
+        .stdout = .inherit,
+        .stderr = .inherit,
+    });
+
+    if (child.stdin) |s| {
+        init.io.vtable.fileClose(init.io.userdata, &.{s});
+        child.stdin = null;
+    }
+
+    const term = try init.io.vtable.childWait(init.io.userdata, &child);
+
+    switch (term) {
+        .exited => |code| if (code != 0) return error.ProcessFailed,
+        else => return error.ProcessTerminatedUnexpectedly,
+    }
 }
 
-fn argsToCutFlags(args: []const []const u8) !CutFlags {
+fn getFFmpegArgs(alloc: std.mem.Allocator, cut_flags: CutFlags) ![]const []const u8 {
+    // reference: ffmpeg -ss 00:00:34 -to 00:01:00 -i input.mp4 -c copy output.mp4
+    var args = std.ArrayList([]const u8).empty;
+
+    try args.append(alloc, "ffmpeg");
+    try args.append(alloc, "-ss");
+
+    const start = try std.fmt.allocPrint(alloc, "{d}:{d}:{d}", .{ cut_flags.start.hour, cut_flags.start.min, cut_flags.start.secs });
+    try args.append(alloc, start);
+
+    try args.append(alloc, "-to");
+
+    const end = try std.fmt.allocPrint(alloc, "{d}:{d}:{d}", .{ cut_flags.end.hour, cut_flags.end.min, cut_flags.end.secs });
+    try args.append(alloc, end);
+
+    try args.append(alloc, "-i");
+    try args.append(alloc, cut_flags.input_file_name);
+    try args.append(alloc, "-c");
+    try args.append(alloc, "copy");
+    try args.append(alloc, cut_flags.output_name);
+
+    return args.toOwnedSlice(alloc);
+}
+
+fn argsToCutFlags(writer: *std.Io.Writer, args: []const []const u8) !?CutFlags {
     var cut_flags: CutFlags = .{
         .input_file_name = "",
         .output_name = "",
@@ -35,6 +78,11 @@ fn argsToCutFlags(args: []const []const u8) !CutFlags {
     var i: u8 = 0;
     while (i < args.len) : (i += 1) {
         const arg = args[i];
+
+        if (checker.flagsEql(arg, &.{ "-h", "--help" })) {
+            try help.helpCut(writer);
+            return null;
+        }
 
         // output name definition
         if (checker.flagsEql(arg, &.{ "-o", "--output" })) {

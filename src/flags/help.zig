@@ -17,3 +17,15 @@ pub fn help(writer: *std.Io.Writer) !void {
 
     _ = writer.flush() catch {};
 }
+
+pub fn helpCut(writer: *std.Io.Writer) !void {
+    try writer.print("{s}{s}Usage{s}: kz {s}cut{s} <input_file> <start> <end> [-o outname]\n\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET, colors.SECONDARY, colors.RESET });
+
+    try writer.print("{s}{s}Example{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
+    try writer.print("  kz {s}cut{s} input.mp4 00:34 01:00 -o output.mp4\n\n", .{ colors.PRIMARY, colors.RESET });
+
+    try writer.print("{s}{s}Options{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
+    try writer.print("  {s}-h{s}, {s}--help{s}        Show this help message\n", .{ colors.SECONDARY, colors.RESET, colors.SECONDARY, colors.RESET });
+
+    _ = writer.flush() catch {};
+}
