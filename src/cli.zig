@@ -1,5 +1,6 @@
 const std = @import("std");
 const Io = std.Io;
+const colors = @import("./ui/color.zig");
 
 // utilitys
 const checker = @import("./utils/checker.zig");
@@ -52,7 +53,7 @@ pub fn cli(init: std.process.Init) !u8 {
 
         // print help in stderr
         try help.help(writer.stderr);
-        try writer.stderr.print("\nUnknown command: '{s}'\n", .{arg});
+        try writer.stderr.print("\n{s}Unknown command{s}: '{s}'\n", .{ colors.ERROR, colors.RESET, arg });
         return 1;
     }
 
