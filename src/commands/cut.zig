@@ -6,9 +6,31 @@ const styles = @import("../ui/styles.zig");
 const checker = @import("../utils/checker.zig");
 const help = @import("../flags/help.zig");
 
+const FormatsSupported = @import("../media_formats/formats_supported.zig").FormatsSupported;
+
+pub inline fn validateCutFlags(writer: *std.Io.Writer, cut_flags: CutFlags) !bool {
+    try writer.print("\n", .{});
+
+    const input_ok = checker.argEndsWithSome(cut_flags.input_file_name, FormatsSupported.getValues()) and cut_flags.input_file_name.len > 0;
+    if (!input_ok) try writer.print("{s}{s}Error{s}: Need a media input file (e.g .mp4).\n", .{ styles.BOLD, colors.ERROR, colors.RESET });
+
+    const out_ok = checker.argEndsWithSome(cut_flags.output_name, FormatsSupported.getValues()) and cut_flags.output_name.len > 0;
+    // shows error if only output_name is wrong
+    if (!out_ok and input_ok) try writer.print("{s}{s}Error{s}: Outname '{s}{s}{s}' not is valid.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, colors.ERROR, cut_flags.output_name, colors.RESET });
+
+    // pass writer to 'isOk' to report the error more specifically
+    const time_ok = try Time.isOk(writer, cut_flags.start, cut_flags.end);
+
+    return input_ok and out_ok and time_ok;
+}
+
 pub fn cut(init: std.process.Init, alloc: std.mem.Allocator, writer: *std.Io.Writer, args: []const []const u8) !void {
     const maybe_flags = try argsToCutFlags(writer, args);
     const cut_flags = maybe_flags orelse return;
+
+    if (!(try validateCutFlags(writer, cut_flags))) {
+        return error.NoInputFile;
+    }
 
     const ffmpeg_args = try getFFmpegArgs(alloc, cut_flags);
     defer alloc.free(ffmpeg_args);
@@ -108,12 +130,17 @@ fn argsToCutFlags(writer: *std.Io.Writer, args: []const []const u8) !?CutFlags {
         // output name definition
         if (checker.flagsEql(arg, &.{ "-o", "--output" })) {
             i += 1;
-            if (i < args.len) cut_flags.updateOutName(args[i]);
+            if (i < args.len) {
+                cut_flags.updateOutName(args[i]);
+            } else {
+                try writer.print("{s}{s}Error{s}: Missing output file name after '{s}' flag.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, arg });
+                return null;
+            }
             continue;
         }
 
         // input file
-        if (!has_input_file and checker.argEndsWithSome(arg, FormsSupported.getValues())) {
+        if (!has_input_file and checker.argEndsWithSome(arg, FormatsSupported.getValues())) {
             cut_flags.input_file_name = arg;
             if (cut_flags.output_name.len == 0) cut_flags.updateOutName(arg);
             has_input_file = true;
@@ -173,22 +200,27 @@ const Time = struct {
 
         return time;
     }
-};
 
-const FormsSupported = enum {
-    mp4,
-    mkv,
-    avi,
+    pub fn isOk(writer: anytype, start: Time, end: Time) !bool {
+        if (start.hour > end.hour) {
+            try writer.print("{s}{s}Error{s}: The start hour '{s}{d}{s}' cannot be greater than the end hour '{s}{d}{s}'.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, colors.ERROR, start.hour, colors.RESET, colors.ERROR, end.hour, colors.RESET });
+            return false;
+        }
 
-    pub fn getValues() []const []const u8 {
-        const fields = std.enums.values(FormsSupported);
-        return comptime blk: {
-            var names: [fields.len][]const u8 = undefined;
-            for (fields, 0..) |field, i| {
-                names[i] = "." ++ @tagName(field);
+        if (start.hour == end.hour) {
+            if (start.min > end.min) {
+                try writer.print("{s}{s}Error{s}: The start minutes '{s}{d}{s}' cannot be greater than the end minutes '{s}{d}{s}'.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, colors.ERROR, start.min, colors.RESET, colors.ERROR, end.min, colors.RESET });
+                return false;
             }
-            const static_names = names;
-            break :blk &static_names;
-        };
+
+            if (start.min == end.min) {
+                if (start.secs > end.secs) {
+                    try writer.print("{s}{s}Error{s}: The start seconds '{s}{d}{s}' cannot be greater than the end seconds '{s}{d}{s}'.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, colors.ERROR, start.secs, colors.RESET, colors.ERROR, end.secs, colors.RESET });
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 };

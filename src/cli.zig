@@ -12,6 +12,7 @@ const help = @import("./flags/help.zig");
 
 // commands
 const cut = @import("./commands/cut.zig");
+const info = @import("./commands/info.zig");
 
 pub fn cli(init: std.process.Init) !u8 {
     const alloc = init.arena.allocator();
@@ -56,6 +57,16 @@ pub fn cli(init: std.process.Init) !u8 {
                         return 1;
                     },
                 }
+            };
+
+            return 0;
+        }
+
+        if (checker.argEql(arg, "info")) {
+            // +1 because of the 'info' argument
+            info.info(init, writer.stdout, args[i + 1 ..]) catch {
+                try help.helpInfo(writer.stderr);
+                return 1;
             };
 
             return 0;

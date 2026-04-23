@@ -1,4 +1,5 @@
 const std = @import("std");
+const FormatsSupported = @import("../media_formats/formats_supported.zig").FormatsSupported;
 
 pub inline fn argEql(arg: []const u8, target: []const u8) bool {
     return std.mem.eql(u8, arg, target);
@@ -30,4 +31,11 @@ pub inline fn argStartsWithSome(arg: []const u8, needs: []const []const u8) bool
     }
 
     return false;
+}
+
+pub inline fn validadeVideoFile(file: []const u8) !bool {
+    const is_media_file = argEndsWithSome(file, FormatsSupported.getValues());
+    const has_name = file.len > 0;
+
+    return is_media_file and has_name;
 }
