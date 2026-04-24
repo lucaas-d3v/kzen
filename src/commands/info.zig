@@ -59,12 +59,23 @@ pub fn info(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
 
     const ffprobe_data = parsed.value;
 
+    if (ffprobe_data.format.format_name) |f_name| {
+        const format = blk: {
+            var parts = std.mem.splitScalar(u8, f_name, ',');
+
+            break :blk parts.next() orelse f_name;
+        };
+
+        try writer.print("{s}Format{s}: {s}{s}{s}\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, format, colors.RESET });
+    }
+
     if (ffprobe_data.format.duration) |d_str| {
         const duration = try parseDuration(d_str);
-        try writer.print("{s}Duration{s}: {s}{d:.2}s{s}\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, duration, colors.RESET });
+        try writer.print("{s}Duration{s}: {s}\n", .{ colors.PRIMARY, colors.RESET, humanizeDuration(alloc, duration) });
     }
+
     if (ffprobe_data.format.bit_rate) |br_str| {
-        try writer.print("{s}Bitrate{s}: {s}{d:.2}{s} Mbps\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, try humanizeBitrate(br_str), colors.RESET });
+        try writer.print("{s}Bitrate{s}: {s}{d:.2}{s} kb/s\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, try humanizeBitrate(br_str), colors.RESET });
     }
 
     // streams
@@ -85,8 +96,20 @@ pub fn info(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
     }
 }
 
+fn humanizeDuration(alloc: std.mem.Allocator, brute_seconds: f32) []const u8 {
+    const total_secs = @as(u32, @intFromFloat(brute_seconds));
+
+    const hours = total_secs / 3600;
+    const minutes = (total_secs % 3600) / 60;
+    const seconds = total_secs % 60;
+
+    const r = std.fmt.allocPrint(alloc, "{s}{d:0>2}{s}:{s}{d:0>2}{s}:{s}{d:0>2}{s}", .{ colors.TEXT, hours, colors.RESET, colors.TEXT, minutes, colors.RESET, colors.TEXT, seconds, colors.RESET }) catch "00:00:00";
+
+    return r;
+}
+
 fn humanizeBitrate(bitrate: []const u8) !f32 {
-    return try std.fmt.parseFloat(f32, bitrate) / 1000 / 1000;
+    return try std.fmt.parseFloat(f32, bitrate) / 1000;
 }
 
 fn getFFprobeArgs(alloc: std.mem.Allocator, info_flags: InfoFlags) ![]const []const u8 {
@@ -166,6 +189,7 @@ const FfprobeStream = struct {
 };
 
 const FfprobeFormat = struct {
+    format_name: ?[]const u8 = null,
     duration: ?[]const u8 = null,
     bit_rate: ?[]const u8 = null,
 };
