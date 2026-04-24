@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const opts = b.addOptions();
-    opts.addOption([]const u8, "kzen_version", "0.4.0-dev");
+    opts.addOption([]const u8, "kzen_version", "0.5.0-dev");
 
     const mod = b.addModule("kzen", .{
         .root_source_file = b.path("src/cli.zig"),
