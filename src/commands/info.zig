@@ -49,6 +49,23 @@ pub fn info(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
         else => return error.ProcessTerminatedUnexpectedly,
     }
 
+    if (info_flags.show_json) {
+        const parsed = try std.json.parseFromSlice(std.json.Value, alloc, stdout_output, .{});
+        defer parsed.deinit();
+
+        var s: std.json.Stringify = .{
+            .writer = writer,
+            .options = .{ .whitespace = .indent_4 },
+        };
+
+        try s.write(parsed.value);
+
+        try writer.print("\n", .{});
+        try writer.flush();
+
+        return;
+    }
+
     try writer.print("{s}File{s}: {s}{s}{s}\n", .{ colors.PRIMARY, colors.RESET, colors.TEXT, info_flags.input_file, colors.RESET });
     try writer.flush();
 
@@ -83,7 +100,10 @@ pub fn info(init: std.process.Init, writer: *std.Io.Writer, args: []const []cons
         if (std.mem.eql(u8, stream.codec_type, "video")) {
             try writer.print("\n{s}Video{s}:\n", .{ colors.PRIMARY, colors.RESET });
             if (stream.codec_name) |codec| try writer.print("  {s}{s}Codec{s}: {s}{s}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, codec, colors.RESET });
-            if (stream.width) |w| try writer.print("  {s}{s}Resolution{s}: {s}{d}{s}x{s}{d}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, w, colors.RESET, colors.TEXT, stream.height.?, colors.RESET });
+
+            if (stream.width) |w| if (stream.height) |h| {
+                try writer.print("{s}{s}Resolution{s}: {s}{d}x{d}{s}\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, colors.TEXT, w, h, colors.RESET });
+            };
 
             if (stream.avg_frame_rate) |fps_str| {
                 const fps = try parseFps(fps_str);
@@ -134,6 +154,7 @@ fn getFFprobeArgs(alloc: std.mem.Allocator, info_flags: InfoFlags) ![]const []co
 
 fn parseInfoFlagsFromArgs(writer: *std.Io.Writer, args: []const []const u8) !?InfoFlags {
     var info_flags: InfoFlags = .{
+        .show_json = false,
         .input_file = "",
     };
 
@@ -148,6 +169,11 @@ fn parseInfoFlagsFromArgs(writer: *std.Io.Writer, args: []const []const u8) !?In
             return null;
         }
 
+        if (checker.flagsEql(arg, &.{ "-j", "--json" })) {
+            info_flags.show_json = true;
+            continue;
+        }
+
         if (!has_input_file) {
             has_input_file = true;
             info_flags.input_file = arg;
@@ -158,7 +184,7 @@ fn parseInfoFlagsFromArgs(writer: *std.Io.Writer, args: []const []const u8) !?In
     return info_flags;
 }
 
-// converts "60/1" or "30000/1001" to f32
+// converts to f32
 fn parseFps(fps_str: []const u8) !f32 {
     var it = std.mem.splitScalar(u8, fps_str, '/');
     const num_str = it.next() orelse return error.InvalidFpsFormat;
@@ -171,12 +197,13 @@ fn parseFps(fps_str: []const u8) !f32 {
     return num / den;
 }
 
-// converts "62.346000" to f32
+// converts to f32
 fn parseDuration(duration_str: []const u8) !f32 {
     return std.fmt.parseFloat(f32, duration_str);
 }
 
 const InfoFlags = struct {
+    show_json: bool,
     input_file: []const u8,
 };
 

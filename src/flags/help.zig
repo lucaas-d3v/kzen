@@ -40,6 +40,7 @@ pub fn helpInfo(writer: *std.Io.Writer) !void {
 
     try writer.print("{s}{s}Options{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
     try writer.print("  {s}{s}-h{s}, {s}{s}--help{s}        Show this help message\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
+    try writer.print("  {s}{s}-j{s}, {s}{s}--json{s}        Show info has json\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
 
     _ = writer.flush() catch {};
 }
