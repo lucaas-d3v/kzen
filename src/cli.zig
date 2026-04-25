@@ -13,6 +13,7 @@ const help = @import("./flags/help.zig");
 // commands
 const cut = @import("./commands/cut.zig");
 const info = @import("./commands/info.zig");
+const filter = @import("./commands/filter.zig");
 
 pub fn cli(init: std.process.Init) !u8 {
     const alloc = init.arena.allocator();
@@ -49,7 +50,7 @@ pub fn cli(init: std.process.Init) !u8 {
         // commands
         if (checker.argEql(arg, "cut")) {
             // +1 because of the 'cut' argument
-            cut.cut(init, alloc, writer.stdout, args[i + 1 ..]) catch |err| {
+            cut.cut(&init, alloc, writer.stdout, args[i + 1 ..]) catch |err| {
                 switch (err) {
                     error.ProcessFailed => return 1,
                     else => {
@@ -64,8 +65,18 @@ pub fn cli(init: std.process.Init) !u8 {
 
         if (checker.argEql(arg, "info")) {
             // +1 because of the 'info' argument
-            info.info(init, writer.stdout, args[i + 1 ..]) catch {
+            info.info(&init, writer.stdout, args[i + 1 ..]) catch {
                 try help.helpInfo(writer.stderr);
+                return 1;
+            };
+
+            return 0;
+        }
+
+        if (checker.argEql(arg, "filter")) {
+            // +1 because of the 'filter' argument
+            filter.filter(&init, writer.stdout, args[i + 1 ..]) catch {
+                try help.helpFilter(writer.stderr);
                 return 1;
             };
 

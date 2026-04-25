@@ -6,29 +6,13 @@ const styles = @import("../ui/styles.zig");
 const checker = @import("../utils/checker.zig");
 const help = @import("../flags/help.zig");
 
-const FormatsSupported = @import("../media_formats/formats_supported.zig").FormatsSupported;
+const VideoFormatsSupported = @import("../media_formats/formats_supported.zig").VideoFormatsSupported;
 
-pub inline fn validateCutFlags(writer: *std.Io.Writer, cut_flags: CutFlags) !bool {
-    try writer.print("\n", .{});
-
-    const input_ok = checker.argEndsWithSome(cut_flags.input_file_name, FormatsSupported.getValues()) and cut_flags.input_file_name.len > 0;
-    if (!input_ok) try writer.print("{s}{s}Error{s}: Need a media input file (e.g .mp4).\n", .{ styles.BOLD, colors.ERROR, colors.RESET });
-
-    const out_ok = checker.argEndsWithSome(cut_flags.output_name, FormatsSupported.getValues()) and cut_flags.output_name.len > 0;
-    // shows error if only output_name is wrong
-    if (!out_ok and input_ok) try writer.print("{s}{s}Error{s}: Outname '{s}{s}{s}' not is valid.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, colors.ERROR, cut_flags.output_name, colors.RESET });
-
-    // pass writer to 'isOk' to report the error more specifically
-    const time_ok = try Time.isOk(writer, cut_flags.start, cut_flags.end);
-
-    return input_ok and out_ok and time_ok;
-}
-
-pub fn cut(init: std.process.Init, alloc: std.mem.Allocator, writer: *std.Io.Writer, args: []const []const u8) !void {
+pub fn cut(init: *const std.process.Init, alloc: std.mem.Allocator, writer: *std.Io.Writer, args: []const []const u8) !void {
     const maybe_flags = try argsToCutFlags(writer, args);
     const cut_flags = maybe_flags orelse return;
 
-    if (!(try validateCutFlags(writer, cut_flags))) {
+    if (!(try cut_flags.validateCutFlags(writer))) {
         return error.NoInputFile;
     }
 
@@ -140,7 +124,7 @@ fn argsToCutFlags(writer: *std.Io.Writer, args: []const []const u8) !?CutFlags {
         }
 
         // input file
-        if (!has_input_file and checker.argEndsWithSome(arg, FormatsSupported.getValues())) {
+        if (!has_input_file and checker.argEndsWithSome(arg, VideoFormatsSupported.getValues())) {
             cut_flags.input_file_name = arg;
             if (cut_flags.output_name.len == 0) cut_flags.updateOutName(arg);
             has_input_file = true;
@@ -173,6 +157,22 @@ const CutFlags = struct {
 
     pub inline fn updateOutName(self: *CutFlags, new_name: []const u8) void {
         self.output_name = new_name;
+    }
+
+    pub inline fn validateCutFlags(self: CutFlags, writer: *std.Io.Writer) !bool {
+        try writer.print("\n", .{});
+
+        const input_ok = checker.argEndsWithSome(self.input_file_name, VideoFormatsSupported.getValues()) and self.input_file_name.len > 0;
+        if (!input_ok) try writer.print("{s}{s}Error{s}: Need a media input file (e.g .mp4).\n", .{ styles.BOLD, colors.ERROR, colors.RESET });
+
+        const out_ok = checker.argEndsWithSome(self.output_name, VideoFormatsSupported.getValues()) and self.output_name.len > 0;
+        // shows error if only output_name is wrong
+        if (!out_ok and input_ok) try writer.print("{s}{s}Error{s}: Outname '{s}{s}{s}' not is valid.\n", .{ styles.BOLD, colors.ERROR, colors.RESET, colors.ERROR, self.output_name, colors.RESET });
+
+        // pass writer to 'isOk' to report the error more specifically
+        const time_ok = try Time.isOk(writer, self.start, self.end);
+
+        return input_ok and out_ok and time_ok;
     }
 };
 

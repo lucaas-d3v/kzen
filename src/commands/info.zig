@@ -5,7 +5,7 @@ const colors = @import("../ui/color.zig");
 const checker = @import("../utils/checker.zig");
 const help = @import("../flags/help.zig");
 
-pub fn info(init: std.process.Init, writer: *std.Io.Writer, args: []const []const u8) !void {
+pub fn info(init: *const std.process.Init, writer: *std.Io.Writer, args: []const []const u8) !void {
     const maybe_flags = try parseInfoFlagsFromArgs(writer, args);
     const info_flags = maybe_flags orelse return;
 

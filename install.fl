@@ -10,7 +10,7 @@ fn build_kzen(is_debug: bool) {
         return;
     }
 
-    const result = process.spawn("zig build -Doptimize=ReleaseSmall -Dcpu=native", false)
+    const result = process.spawn("zig build -Doptimize=ReleaseFast -Dcpu=native", false)
         ~> process.assert("Build failed");        
 }
 

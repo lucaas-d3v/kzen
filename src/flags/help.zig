@@ -7,7 +7,8 @@ pub fn help(writer: *std.Io.Writer) !void {
 
     try writer.print("{s}{s}Commands{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
     try writer.print("  {s}{s}cut{s}               Cut segment from a video\n", .{ styles.DIM, colors.SECONDARY, colors.RESET });
-    try writer.print("  {s}{s}info{s}              Show data from a video\n\n", .{ styles.DIM, colors.SECONDARY, colors.RESET });
+    try writer.print("  {s}{s}info{s}              Show data from a video\n", .{ styles.DIM, colors.SECONDARY, colors.RESET });
+    try writer.print("  {s}{s}filter{s}            Apply a filter on image (video in future)\n\n", .{ styles.DIM, colors.SECONDARY, colors.RESET });
 
     try writer.print("{s}{s}Options{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
     try writer.print("  {s}{s}-h{s}, {s}{s}--help{s}        Show this help message\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
@@ -41,6 +42,19 @@ pub fn helpInfo(writer: *std.Io.Writer) !void {
     try writer.print("{s}{s}Options{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
     try writer.print("  {s}{s}-h{s}, {s}{s}--help{s}        Show this help message\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
     try writer.print("  {s}{s}-j{s}, {s}{s}--json{s}        Show info has json\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
+
+    _ = writer.flush() catch {};
+}
+
+pub fn helpFilter(writer: *std.Io.Writer) !void {
+    try writer.print("{s}{s}Usage{s}: kz {s}{s}filter{s} <input_file> <filter> [filter params] [-o outname]\n\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
+
+    // kz filter input.ppm grayscale -o out.ppm
+    try writer.print("{s}{s}Example{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
+    try writer.print("  kz {s}{s}filter{s} input.ppm grayscale -o out.ppm\n\n", .{ styles.DIM, colors.SECONDARY, colors.RESET });
+
+    try writer.print("{s}{s}Options{s}:\n", .{ styles.BOLD, colors.PRIMARY, colors.RESET });
+    try writer.print("  {s}{s}-h{s}, {s}{s}--help{s}        Show this help message\n", .{ styles.DIM, colors.SECONDARY, colors.RESET, styles.DIM, colors.SECONDARY, colors.RESET });
 
     _ = writer.flush() catch {};
 }
